@@ -1,4 +1,9 @@
-"""String formatting routines for __repr__."""
+"""String formatting routines for qcodes.DataSet.__repr__.
+
+This code heavily borrows from `xarray`, whose license can be found
+in `licenses/XARRAY_LICENSE`.
+"""
+
 import contextlib
 from datetime import datetime, timedelta
 from itertools import zip_longest

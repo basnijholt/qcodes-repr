@@ -1,3 +1,10 @@
+"""Code for displaying `qcodes.DataSet`s in HTML.
+
+This code heavily borrows from `xarray`, whose license can be found
+in `licenses/XARRAY_LICENSE`.
+
+The license of the icons used is in `licenses/ICOMOON_LICENSE`.
+"""
 import uuid
 from functools import partial
 from html import escape
