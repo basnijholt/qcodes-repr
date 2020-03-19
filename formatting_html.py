@@ -93,7 +93,7 @@ def dim_section(dims):
     dim_list = format_dims(dims)
 
     return collapsible_section(
-        "Dimensions", inline_details=dim_list, enabled=False, collapsed=True
+        "Sweep parameters", inline_details=dim_list, enabled=False, collapsed=True
     )
 
 
@@ -178,14 +178,14 @@ def _mapping_section(mapping, name, details_func, max_items_collapse, enabled=Tr
 
 coord_section = partial(
     _mapping_section,
-    name="Coordinates",
+    name="Independent parameters",
     details_func=summarize_coords,
     max_items_collapse=25,
 )
 
 datavar_section = partial(
     _mapping_section,
-    name="Data variables",
+    name="Dependent parameters",
     details_func=summarize_vars,
     max_items_collapse=15,
 )
@@ -242,6 +242,7 @@ def _qc_ds_info(qc_ds):
     return ds
 
 
-def display_qc_ds(qc_ds):
+def _repr_html_(qc_ds):
+    from IPython.display import HTML
 
     return HTML(dataset_repr(qc_ds))
