@@ -1,43 +1,99 @@
-from ipywidgets import Box, Button, GridspecLayout, Layout
+from functools import partial
+
+from ipywidgets import Box, Button, GridspecLayout, Label, Layout
 from toolz.dicttoolz import get_in
 
 
-def create_expanded_button(description, button_style):
-    return Button(
+def botton(description, button_style, on_click=None):
+    b = Button(
         description=description,
         button_style=button_style,
         layout=Layout(height="auto", width="auto"),
     )
+    if on_click is not None:
+        b.on_click(on_click)
+    return b
 
 
-def update(nested_keys, table, box):
+def text(description):
+    return Label(value=description, layout=Layout(height="max-content", width="auto"))
+
+
+def _update(nested_keys, table, box, ncols):
+    draw = two_columns if ncols == 2 else three_columns
+
     def _(_):
         box.children = (draw(nested_keys, table, box),)
 
     return _
 
 
-def draw(nested_keys, table, box):
+def two_columns(nested_keys, table, box):
+    update = partial(_update, table=table, box=box, ncols=2)
     selected_table = get_in(nested_keys, table)
     grid = GridspecLayout(len(selected_table) + 1, 30)
     title = " ► ".join(nested_keys)
-    header = create_expanded_button(title, "success")
+    header = botton(title, "success")
     grid[0, :-1] = header
-    back_button = create_expanded_button("↰", "info")
-    back_button.on_click(update(nested_keys[:-1], table, box))
-    grid[0, -1] = back_button
+    grid[0, -1] = botton("↰", "info", update(nested_keys[:-1]))
     for i, (k, v) in enumerate(selected_table.items()):
-        grid[i + 1, :10] = create_expanded_button(k, "warning")
-        if isinstance(v, dict) and v != {}:
-            button = create_expanded_button(", ".join(v.keys()), "danger")
-            button.on_click(update(nested_keys + [k], table, box))
-            grid[i + 1, 10:] = button
+        grid[i + 1, :10] = botton(k, "warning", update(nested_keys[:-1]))
+        if _should_expand(v):
+            grid[i + 1, 10:] = botton(
+                ", ".join(v.keys()), "danger", update([*nested_keys, k])
+            )
         else:
-            grid[i + 1, 10:] = create_expanded_button(str(v), "")
+            grid[i + 1, 10:] = text(str(v))
     return grid
 
 
-def nested_dict_browser(nested_dict, nested_keys=[]):
+def _should_expand(x):
+    return isinstance(x, dict) and x != {}
+
+
+def _row_length(table):
+    length = sum(len(v) if _should_expand(v) else 1 for v in table.values())
+    return length + 1
+
+
+def three_columns(nested_keys, table, box):
+    update = partial(_update, table=table, box=box, ncols=3)
+    col_lens = [8, 16, 30]
+    selected_table = get_in(nested_keys, table)
+    grid = GridspecLayout(_row_length(selected_table), col_lens[-1])
+
+    # Header
+    title = " ► ".join(nested_keys)
+    header = botton(title, "success")
+    grid[0, :-1] = header
+    up_click = update(nested_keys[:-1])
+    back_button = botton("↰", "info", up_click)
+    grid[0, -1] = back_button
+
+    # Body
+    i = 1
+    for k, v in selected_table.items():
+        row_length = len(v) if _should_expand(v) else 1
+        button = botton(k, "info", up_click)
+        grid[i : i + row_length, : col_lens[0]] = button
+        if _should_expand(v):
+            for k_, v_ in v.items():
+                button = botton(k_, "danger", update([*nested_keys, k]))
+                grid[i, col_lens[0] : col_lens[1]] = button
+                if isinstance(v_, dict) and v_ != {}:
+                    sub_keys = ", ".join(v_.keys())
+                    button = botton(sub_keys, "warning", update([*nested_keys, k, k_]))
+                else:
+                    button = text(str(v_))
+                grid[i, col_lens[1] :] = button
+                i += 1
+        else:
+            grid[i, col_lens[0] :] = text(str(v))
+            i += 1
+    return grid
+
+
+def nested_dict_browser(nested_dict, nested_keys=[], ncols=3):
     box = Box([])
-    update([], nested_dict, box)(None)
+    _update(nested_keys, nested_dict, box, ncols)(None)
     return box
