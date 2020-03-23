@@ -54,16 +54,12 @@ def _should_expand(x):
     return isinstance(x, dict) and x != {}
 
 
-def _row_length(table):
-    length = sum(len(v) if _should_expand(v) else 1 for v in table.values())
-    return length + 1
-
-
 def three_columns(nested_keys, table, box):
     update = partial(_update, table=table, box=box, ncols=3)
     col_widths = [8, 16, 30]
     selected_table = get_in(nested_keys, table)
-    grid = GridspecLayout(_row_length(selected_table), col_widths[-1])
+    nrows = sum(len(v) if _should_expand(v) else 1 for v in selected_table.values()) + 1
+    grid = GridspecLayout(nrows, col_widths[-1])
 
     # Header
     title = " ► ".join(nested_keys)
