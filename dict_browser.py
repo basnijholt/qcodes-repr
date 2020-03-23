@@ -32,16 +32,19 @@ def two_columns(nested_keys, table, box):
     update = partial(_update, table=table, box=box, ncols=2)
     selected_table = get_in(nested_keys, table)
     grid = GridspecLayout(len(selected_table) + 1, 30)
+
+    # Header
     title = " ► ".join(nested_keys)
-    header = botton(title, "success")
-    grid[0, :-1] = header
-    grid[0, -1] = botton("↰", "info", update(nested_keys[:-1]))
+    grid[0, :-1] = botton(title, "success")
+    up_click = update(nested_keys[:-1])
+    grid[0, -1] = botton("↰", "info", up_click)
+
+    # Body
     for i, (k, v) in enumerate(selected_table.items()):
-        grid[i + 1, :10] = botton(k, "warning", update(nested_keys[:-1]))
+        grid[i + 1, :10] = botton(k, "warning", up_click)
         if _should_expand(v):
-            grid[i + 1, 10:] = botton(
-                ", ".join(v.keys()), "danger", update([*nested_keys, k])
-            )
+            sub_keys = ", ".join(v.keys())
+            grid[i + 1, 10:] = botton(sub_keys, "danger", update([*nested_keys, k]))
         else:
             grid[i + 1, 10:] = text(str(v))
     return grid
@@ -58,37 +61,35 @@ def _row_length(table):
 
 def three_columns(nested_keys, table, box):
     update = partial(_update, table=table, box=box, ncols=3)
-    col_lens = [8, 16, 30]
+    col_widths = [8, 16, 30]
     selected_table = get_in(nested_keys, table)
-    grid = GridspecLayout(_row_length(selected_table), col_lens[-1])
+    grid = GridspecLayout(_row_length(selected_table), col_widths[-1])
 
     # Header
     title = " ► ".join(nested_keys)
-    header = botton(title, "success")
-    grid[0, :-1] = header
+    grid[0, :-1] = botton(title, "success")
     up_click = update(nested_keys[:-1])
-    back_button = botton("↰", "info", up_click)
-    grid[0, -1] = back_button
+    grid[0, -1] = botton("↰", "info", up_click)
 
     # Body
     i = 1
     for k, v in selected_table.items():
         row_length = len(v) if _should_expand(v) else 1
         button = botton(k, "info", up_click)
-        grid[i : i + row_length, : col_lens[0]] = button
+        grid[i : i + row_length, : col_widths[0]] = button
         if _should_expand(v):
             for k_, v_ in v.items():
                 button = botton(k_, "danger", update([*nested_keys, k]))
-                grid[i, col_lens[0] : col_lens[1]] = button
+                grid[i, col_widths[0] : col_widths[1]] = button
                 if isinstance(v_, dict) and v_ != {}:
                     sub_keys = ", ".join(v_.keys())
                     button = botton(sub_keys, "warning", update([*nested_keys, k, k_]))
                 else:
                     button = text(str(v_))
-                grid[i, col_lens[1] :] = button
+                grid[i, col_widths[1] :] = button
                 i += 1
         else:
-            grid[i, col_lens[0] :] = text(str(v))
+            grid[i, col_widths[0] :] = text(str(v))
             i += 1
     return grid
 
