@@ -71,7 +71,7 @@ def _nested_dict_browser(nested_keys, table, box, max_nrows=30):
     title = " ► ".join(nested_keys)
     grid[0, :-1] = button(title, "success")
     up_click = update(nested_keys[:-1])
-    grid[0, -1] = button("↰", "info", up_click)
+    grid[0, -1] = button("", "info", up_click, button_kwargs=dict(icon="undo"))
 
     # Body
 
@@ -151,7 +151,7 @@ def do_in_tab(tab, ds, which):
             else:
                 display(nested_dict_browser(ds.snapshot))
             remove_button = button(
-                f"Remove {which}",
+                f"Clear {which}",
                 "danger",
                 on_click=delete_tab(out, tab),
                 button_kwargs=dict(icon="eraser"),
@@ -229,13 +229,13 @@ def expandable_dict(dct, tab, ds):
                 "Plot",
                 "warning",
                 on_click=do_in_tab(tab, ds, "plot"),
-                button_kwargs=dict(icon="pen"),
+                button_kwargs=dict(icon="line-chart"),
             )
             snapshot_button = button(
                 "Open snapshot",
                 "warning",
                 on_click=do_in_tab(tab, ds, "snapshot"),
-                button_kwargs=dict(icon="undo"),
+                button_kwargs=dict(icon="camera"),
             )
             back_button = button(
                 "Back",
