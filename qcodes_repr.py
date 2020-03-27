@@ -72,7 +72,7 @@ def _nested_dict_browser(nested_keys, table, box, max_nrows=30):
     title = " ► ".join(nested_keys)
     grid[0, :-1] = button(title, "success")
     up_click = update(nested_keys[:-1])
-    grid[0, -1] = button("", "info", up_click, button_kwargs=dict(icon="undo"))
+    grid[0, -1] = button("↰", "info", up_click)
 
     # Body
 
