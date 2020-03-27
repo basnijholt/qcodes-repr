@@ -1,6 +1,16 @@
+
+import math
 from functools import partial
 
-from ipywidgets import Box, Button, GridspecLayout, Label, Layout
+import matplotlib.pyplot as plt
+import qcodes
+import yaml
+from IPython.core.display import display
+from IPython.display import clear_output
+from ipywidgets import (Box, Button, GridspecLayout, Label, Layout, Output,
+                        Tab, Textarea, VBox)
+from qcodes.dataset.data_export import get_data_by_id
+from qcodes.dataset.plotting import plot_dataset
 from toolz.dicttoolz import get_in
 
 
@@ -98,3 +108,203 @@ def nested_dict_browser(nested_dict, nested_keys=[]):
     box = Box([])
     _update_nested_dict_browser(nested_keys, nested_dict, box)(None)
     return box
+
+
+def plot_in_tab(tab, ds):
+    def delete_tab(output, tab):
+        def on_click(_):
+            tab.children = tuple(c for c in tab.children if c != output)
+
+        return on_click
+
+    def plot_on_click(_):
+        title = f"RID #{ds.run_id}"
+        i = next(
+            (i for i in range(len(tab.children)) if tab.get_title(i) == title), None
+        )
+        if i is not None:
+            # Plot is already in the tab
+            tab.selected_index = i
+            return
+        out = Output()
+        tab.children += (out,)
+        i = len(tab.children) - 1
+        tab.set_title(i, title)
+        with out:
+            clear_output(wait=True)
+            nplots = len(get_data_by_id(ds.run_id))  # TODO: might be a better way
+            nrows = math.ceil(nplots / 2) if nplots != 1 else 1
+            ncols = 2 if nplots != 1 else 1
+            fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows))
+            try:
+                # Sometimes `plot_dataset` doesn't work.
+                plot_dataset(ds, axes=axes.flatten())
+                fig.tight_layout()
+                plt.show(fig)
+            except Exception as e:
+                print(e)  # TODO: print complete traceback
+            remove_button = button(
+                "Remove plot",
+                "danger",
+                on_click=delete_tab(out, tab),
+                button_kwargs=dict(icon="eraser"),
+            )
+            display(remove_button)
+        tab.selected_index = i
+
+    return plot_on_click
+
+
+def create_tab(do_display=True):
+    tab = Tab(children=(Output(),))
+
+    tab.set_title(0, "Info")
+    if do_display:
+        display(tab)
+
+    with tab.children[-1]:
+        print("Plots will show up here!")
+    return tab
+
+
+def editable_metadata(ds):
+    def _button_to_input(text, box):
+        def on_click(_):
+            text_input = Textarea(
+                value=text,
+                placeholder="Enter text",
+                disabled=False,
+                layout=Layout(height="auto", width="auto"),
+            )
+            save_button = button(
+                "",
+                "danger",
+                on_click=_save_button(box, ds),
+                button_kwargs=dict(icon="save"),
+            )
+            box.children = (text_input, save_button)
+
+        return on_click
+
+    def _save_button(box, ds):
+        def on_click(_):
+            text = box.children[0].value
+            ds.add_metadata(tag="Notes", metadata=text)
+            box.children = (_changeble_button(text, box),)
+
+        return on_click
+
+    def _changeble_button(text, box):
+        return button(
+            text,
+            "success",
+            on_click=_button_to_input(text, box),
+            button_kwargs=dict(icon="edit") if text == "" else {},
+        )
+
+    text = ds.metadata.get("Notes") or ""
+    box = VBox([], layout=Layout(height="auto", width="auto"))
+    box.children = (_changeble_button(text, box),)
+    return box
+
+
+def expandable_dict(dct, tab, ds):
+    def _button_to_input(dct, box):
+        def on_click(_):
+            description = yaml.dump(dct)  # TODO: include and extract more data!
+            text_input = Textarea(
+                value=description,
+                placeholder="Enter text",
+                disabled=True,
+                layout=Layout(height="300px", width="auto"),
+            )
+            plot_button = button(
+                "Plot",
+                "warning",
+                on_click=plot_in_tab(tab, ds),
+                button_kwargs=dict(icon="pen"),
+            )
+            back_button = button(
+                "Back",
+                "warning",
+                on_click=_input_to_button(dct, box),
+                button_kwargs=dict(icon="undo"),
+            )
+            box.children = (text_input, back_button, plot_button)
+
+        return on_click
+
+    def _input_to_button(dct, box):
+        def on_click(_):
+            box.children = (_changeble_button(dct, box),)
+
+        return on_click
+
+    def _changeble_button(dct, box):
+        return button(
+            ", ".join(dct),
+            "success",
+            on_click=_button_to_input(dct, box),
+            button_kwargs=dict(icon="edit") if text == "" else {},
+        )
+
+    box = VBox([], layout=Layout(height="auto", width="auto"))
+    box.children = (_changeble_button(dct, box),)
+    return box
+
+
+def get_coords_and_vars(ds):
+    coordinates = {}
+    variables = {}
+    for p, spec in ds.paramspecs.items():
+        attrs = {
+            "unit": spec.unit,
+            "label": spec.label,
+            "type": spec.type,
+        }
+        if spec.depends_on:
+            attrs["depends_on"] = spec.depends_on.split(", ")
+            variables[p] = attrs
+        else:
+            coordinates[p] = attrs
+    return coordinates, variables
+
+
+def experiment_table(tab):
+    header_names = [
+        "Run ID",
+        "Name",
+        "Experiment",
+        "Coordinates",
+        "Variables",
+        "MSMT Time",
+        "Notes",
+    ]
+
+    header = {n: button(n, "info") for n in header_names}
+    rows = [header]
+    for exp in qcodes.experiments():
+        tooltip = f"{exp.name}#{exp.sample_name}@{exp.path_to_db}"
+
+        for ds in exp.data_sets():
+            coords, variables = get_coords_and_vars(ds)
+            row = {}
+            row["Run ID"] = text(str(ds.run_id))
+            row["Name"] = text(ds.name)
+            row["Experiment"] = button(f"#{exp.exp_id}", "warning", tooltip=tooltip)
+            row["Notes"] = editable_metadata(ds)
+            row["Coordinates"] = expandable_dict(coords, tab, ds)
+            row["Variables"] = expandable_dict(variables, tab, ds)
+            row["MSMT Time"] = text(ds.completed_timestamp())
+            rows.append(row)
+
+    grid = GridspecLayout(n_rows=len(rows), n_columns=len(header_names))
+
+    empty_text = text("")
+    for i, row in enumerate(rows):
+        for j, name in enumerate(header_names):
+            grid[i, j] = row.get(name, empty_text)
+
+    grid.layout.grid_template_rows = "auto " * len(rows)
+    grid.layout.grid_template_columns = "auto " * len(header_names)
+    return grid
