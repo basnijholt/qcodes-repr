@@ -10,3 +10,9 @@ initialise_or_create_database_at("phase_2_run_1.db")
 qc_ds = qcodes.experiments()[0].data_sets()
 _repr_html_(qc_ds)
 ```
+
+or the experiment widget
+```python
+import qcodes_repr
+qcodes_repr.experiments_widget("experiments.db")
+```
