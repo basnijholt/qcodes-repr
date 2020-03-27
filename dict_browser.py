@@ -110,15 +110,29 @@ def nested_dict_browser(nested_dict, nested_keys=[]):
     return box
 
 
-def plot_in_tab(tab, ds):
+def do_in_tab(tab, ds, which):
     def delete_tab(output, tab):
         def on_click(_):
             tab.children = tuple(c for c in tab.children if c != output)
 
         return on_click
 
-    def plot_on_click(_):
-        title = f"RID #{ds.run_id}"
+    def _plot_ds(ds):
+        nplots = len(get_data_by_id(ds.run_id))  # TODO: might be a better way
+        nrows = math.ceil(nplots / 2) if nplots != 1 else 1
+        ncols = 2 if nplots != 1 else 1
+        fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows))
+        try:
+            # Sometimes `plot_dataset` doesn't work.
+            plot_dataset(ds, axes=axes.flatten())
+            fig.tight_layout()
+            plt.show(fig)
+        except Exception as e:
+            print(e)  # TODO: print complete traceback
+
+    def _on_click(_):
+        assert which in ("plot", "snapshot")
+        title = f"RID #{ds.run_id} {which}"
         i = next(
             (i for i in range(len(tab.children)) if tab.get_title(i) == title), None
         )
@@ -132,19 +146,12 @@ def plot_in_tab(tab, ds):
         tab.set_title(i, title)
         with out:
             clear_output(wait=True)
-            nplots = len(get_data_by_id(ds.run_id))  # TODO: might be a better way
-            nrows = math.ceil(nplots / 2) if nplots != 1 else 1
-            ncols = 2 if nplots != 1 else 1
-            fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows))
-            try:
-                # Sometimes `plot_dataset` doesn't work.
-                plot_dataset(ds, axes=axes.flatten())
-                fig.tight_layout()
-                plt.show(fig)
-            except Exception as e:
-                print(e)  # TODO: print complete traceback
+            if which == "plot":
+                _plot_ds(ds)
+            else:
+                display(nested_dict_browser(ds.snapshot))
             remove_button = button(
-                "Remove plot",
+                f"Remove {which}",
                 "danger",
                 on_click=delete_tab(out, tab),
                 button_kwargs=dict(icon="eraser"),
@@ -152,7 +159,7 @@ def plot_in_tab(tab, ds):
             display(remove_button)
         tab.selected_index = i
 
-    return plot_on_click
+    return _on_click
 
 
 def create_tab(do_display=True):
@@ -163,7 +170,7 @@ def create_tab(do_display=True):
         display(tab)
 
     with tab.children[-1]:
-        print("Plots will show up here!")
+        print("Plots and snapshots will show up here!")
     return tab
 
 
@@ -221,8 +228,14 @@ def expandable_dict(dct, tab, ds):
             plot_button = button(
                 "Plot",
                 "warning",
-                on_click=plot_in_tab(tab, ds),
+                on_click=do_in_tab(tab, ds, "plot"),
                 button_kwargs=dict(icon="pen"),
+            )
+            snapshot_button = button(
+                "Open snapshot",
+                "warning",
+                on_click=do_in_tab(tab, ds, "snapshot"),
+                button_kwargs=dict(icon="undo"),
             )
             back_button = button(
                 "Back",
@@ -230,7 +243,7 @@ def expandable_dict(dct, tab, ds):
                 on_click=_input_to_button(dct, box),
                 button_kwargs=dict(icon="undo"),
             )
-            box.children = (text_input, back_button, plot_button)
+            box.children = (text_input, snapshot_button, plot_button, back_button)
 
         return on_click
 
