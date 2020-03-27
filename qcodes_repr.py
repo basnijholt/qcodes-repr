@@ -7,8 +7,9 @@ import qcodes
 import yaml
 from IPython.core.display import display
 from IPython.display import clear_output
-from ipywidgets import (Box, Button, GridspecLayout, Label, Layout, Output,
-                        Tab, Textarea, VBox)
+from ipywidgets import (HTML, Box, Button, GridspecLayout, Label, Layout,
+                        Output, Tab, Textarea, VBox)
+from qcodes.dataset import initialise_or_create_database_at
 from qcodes.dataset.data_export import get_data_by_id
 from qcodes.dataset.plotting import plot_dataset
 from toolz.dicttoolz import get_in
@@ -118,12 +119,13 @@ def do_in_tab(tab, ds, which):
         return on_click
 
     def _plot_ds(ds):
-        nplots = len(get_data_by_id(ds.run_id))  # TODO: might be a better way
-        nrows = math.ceil(nplots / 2) if nplots != 1 else 1
-        ncols = 2 if nplots != 1 else 1
-        fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows))
         try:
-            # Sometimes `plot_dataset` doesn't work.
+            # `get_data_by_id` might fail
+            nplots = len(get_data_by_id(ds.run_id))  # TODO: might be a better way
+            nrows = math.ceil(nplots / 2) if nplots != 1 else 1
+            ncols = 2 if nplots != 1 else 1
+            fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows))
+            # `plot_dataset` might also fail.
             plot_dataset(ds, axes=axes.flatten())
             fig.tight_layout()
             plt.show(fig)
@@ -283,7 +285,7 @@ def get_coords_and_vars(ds):
     return coordinates, variables
 
 
-def experiment_table(tab):
+def _experiment_widget(tab):
     header_names = [
         "Run ID",
         "Name",
@@ -321,3 +323,12 @@ def experiment_table(tab):
     grid.layout.grid_template_rows = "auto " * len(rows)
     grid.layout.grid_template_columns = "auto " * len(header_names)
     return grid
+
+
+def experiments_widget(db=None):
+    if db is not None:
+        initialise_or_create_database_at(db)
+    title = HTML("<h1>QCoDeS experiments widget</h1>")
+    tab = create_tab(do_display=False)
+    grid = _experiment_widget(tab)
+    return VBox([title, tab, grid])
