@@ -4,11 +4,25 @@ from ipywidgets import Box, Button, GridspecLayout, Label, Layout
 from toolz.dicttoolz import get_in
 
 
-def button(description, button_style, on_click=None):
+def button(
+    description,
+    button_style=None,
+    on_click=None,
+    tooltip=None,
+    layout_kwargs=None,
+    button_kwargs=None,
+):
+    layout_kwargs = layout_kwargs or {}
     but = Button(
         description=description,
         button_style=button_style,
-        layout=Layout(height="auto", width="auto"),
+        layout=Layout(
+            height=layout_kwargs.pop("height", "auto"),
+            width=layout_kwargs.pop("width", "auto"),
+            **layout_kwargs,
+        ),
+        tooltip=tooltip or description,
+        **(button_kwargs or {}),
     )
     if on_click is not None:
         but.on_click(on_click)
@@ -19,18 +33,17 @@ def text(description):
     return Label(value=description, layout=Layout(height="max-content", width="auto"))
 
 
-def _update(nested_keys, table, box):
+def _update_nested_dict_browser(nested_keys, table, box):
     def _(_):
-        box.children = (draw_table(nested_keys, table, box),)
+        box.children = (_nested_dict_browser(nested_keys, table, box),)
 
     return _
 
 
-def _should_expand(x):
-    return isinstance(x, dict) and x != {}
+def _nested_dict_browser(nested_keys, table, box, max_nrows=30):
+    def _should_expand(x):
+        return isinstance(x, dict) and x != {}
 
-
-def draw_table(nested_keys, table, box, max_nrows=30):
     col_widths = [8, 16, 30]
     selected_table = get_in(nested_keys, table)
     nrows = sum(len(v) if _should_expand(v) else 1 for v in selected_table.values()) + 1
@@ -42,7 +55,7 @@ def draw_table(nested_keys, table, box, max_nrows=30):
         ncols = 2
 
     grid = GridspecLayout(nrows, col_widths[-1])
-    update = partial(_update, table=table, box=box)
+    update = partial(_update_nested_dict_browser, table=table, box=box)
 
     # Header
     title = " ► ".join(nested_keys)
@@ -83,5 +96,5 @@ def draw_table(nested_keys, table, box, max_nrows=30):
 
 def nested_dict_browser(nested_dict, nested_keys=[]):
     box = Box([])
-    _update(nested_keys, nested_dict, box)(None)
+    _update_nested_dict_browser(nested_keys, nested_dict, box)(None)
     return box
