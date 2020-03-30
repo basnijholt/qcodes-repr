@@ -1,15 +1,24 @@
 import math
 from functools import partial
-from typing import (Any, Callable, Dict, Sequence, Optional,
-                    Tuple)
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import qcodes
 import yaml
 from IPython.core.display import display
 from IPython.display import clear_output
-from ipywidgets import (HTML, Box, Button, GridspecLayout, Label, Layout,
-                        Output, Tab, Textarea, VBox)
+from ipywidgets import (
+    HTML,
+    Box,
+    Button,
+    GridspecLayout,
+    Label,
+    Layout,
+    Output,
+    Tab,
+    Textarea,
+    VBox,
+)
 from qcodes.dataset import initialise_or_create_database_at
 from qcodes.dataset.data_export import get_data_by_id
 from qcodes.dataset.data_set import DataSet
@@ -17,6 +26,8 @@ from qcodes.dataset.plotting import plot_dataset
 from toolz.dicttoolz import get_in
 
 from formatting_html import _repr_html_
+
+_META_DATA_KEY = "widget_notes"
 
 
 def button(
@@ -215,7 +226,7 @@ def editable_metadata(ds: DataSet) -> Box:
     def _save_button(box, ds):
         def on_click(_):
             text = box.children[0].value
-            ds.add_metadata(tag="Notes", metadata=text)
+            ds.add_metadata(tag=_META_DATA_KEY, metadata=text)
             box.children = (_changeble_button(text, box),)
 
         return on_click
@@ -228,7 +239,7 @@ def editable_metadata(ds: DataSet) -> Box:
             button_kwargs=dict(icon="edit") if text == "" else {},
         )
 
-    text = ds.metadata.get("Notes") or ""
+    text = ds.metadata.get(_META_DATA_KEY, "")
     box = VBox([], layout=Layout(height="auto", width="auto"))
     box.children = (_changeble_button(text, box),)
     return box
