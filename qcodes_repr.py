@@ -1,6 +1,7 @@
-
 import math
 from functools import partial
+from typing import (Any, Callable, Dict, Iterable, Optional,
+                    Tuple)
 
 import matplotlib.pyplot as plt
 import qcodes
@@ -11,18 +12,22 @@ from ipywidgets import (HTML, Box, Button, GridspecLayout, Label, Layout,
                         Output, Tab, Textarea, VBox)
 from qcodes.dataset import initialise_or_create_database_at
 from qcodes.dataset.data_export import get_data_by_id
+from qcodes.dataset.data_set import DataSet
 from qcodes.dataset.plotting import plot_dataset
 from toolz.dicttoolz import get_in
 
+from formatting_html import _repr_html_
+
 
 def button(
-    description,
-    button_style=None,
-    on_click=None,
-    tooltip=None,
-    layout_kwargs=None,
-    button_kwargs=None,
-):
+    description: str,
+    button_style: Optional[str] = None,
+    on_click: Optional[Callable[[Any], None]] = None,
+    tooltip: Optional[str] = None,
+    layout_kwargs: Optional[Dict[str, Any]] = None,
+    button_kwargs: Optional[Dict[str, Any]] = None,
+) -> Button:
+    """Returns a ipywidgets.Button."""
     layout_kwargs = layout_kwargs or {}
     but = Button(
         description=description,
@@ -40,18 +45,23 @@ def button(
     return but
 
 
-def text(description):
+def text(description: str) -> Label:
+    """Returns a ipywidgets.Label with text."""
     return Label(value=description, layout=Layout(height="max-content", width="auto"))
 
 
-def _update_nested_dict_browser(nested_keys, table, box):
+def _update_nested_dict_browser(
+    nested_keys: Iterable[str], table: Dict[Any, Any], box: Box
+) -> Callable[[Button], None]:
     def _(_):
         box.children = (_nested_dict_browser(nested_keys, table, box),)
 
     return _
 
 
-def _nested_dict_browser(nested_keys, table, box, max_nrows=30):
+def _nested_dict_browser(
+    nested_keys: Iterable[str], table: Dict[Any, Any], box: Box, max_nrows: int = 30
+) -> GridspecLayout:
     def _should_expand(x):
         return isinstance(x, dict) and x != {}
 
@@ -105,35 +115,36 @@ def _nested_dict_browser(nested_keys, table, box, max_nrows=30):
     return grid
 
 
-def nested_dict_browser(nested_dict, nested_keys=[]):
+def nested_dict_browser(nested_dict: Dict[Any, Any], nested_keys: Iterable[str] = ()):
     box = Box([])
     _update_nested_dict_browser(nested_keys, nested_dict, box)(None)
     return box
 
 
-def do_in_tab(tab, ds, which):
+def _plot_ds(ds: DataSet) -> None:
+    try:
+        # `get_data_by_id` might fail
+        nplots = len(get_data_by_id(ds.run_id))  # TODO: might be a better way
+        nrows = math.ceil(nplots / 2) if nplots != 1 else 1
+        ncols = 2 if nplots != 1 else 1
+        fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows))
+        # `plot_dataset` might also fail.
+        plot_dataset(ds, axes=axes.flatten())
+        fig.tight_layout()
+        plt.show(fig)
+    except Exception as e:
+        print(e)  # TODO: print complete traceback
+
+
+def do_in_tab(tab: Tab, ds: DataSet, which: str) -> Callable[[Button], None]:
     def delete_tab(output, tab):
         def on_click(_):
             tab.children = tuple(c for c in tab.children if c != output)
 
         return on_click
 
-    def _plot_ds(ds):
-        try:
-            # `get_data_by_id` might fail
-            nplots = len(get_data_by_id(ds.run_id))  # TODO: might be a better way
-            nrows = math.ceil(nplots / 2) if nplots != 1 else 1
-            ncols = 2 if nplots != 1 else 1
-            fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 4 * nrows))
-            # `plot_dataset` might also fail.
-            plot_dataset(ds, axes=axes.flatten())
-            fig.tight_layout()
-            plt.show(fig)
-        except Exception as e:
-            print(e)  # TODO: print complete traceback
-
     def _on_click(_):
-        assert which in ("plot", "snapshot")
+        assert which in ("plot", "snapshot", "dataset")
         title = f"RID #{ds.run_id} {which}"
         i = next(
             (i for i in range(len(tab.children)) if tab.get_title(i) == title), None
@@ -148,10 +159,16 @@ def do_in_tab(tab, ds, which):
         tab.set_title(i, title)
         with out:
             clear_output(wait=True)
-            if which == "plot":
-                _plot_ds(ds)
-            else:
-                display(nested_dict_browser(ds.snapshot))
+            try:
+                if which == "plot":
+                    _plot_ds(ds)
+                elif which == "snapshot":
+                    display(nested_dict_browser(ds.snapshot))
+                elif which == "dataset":
+                    display(_repr_html_(ds))
+            except Exception as e:
+                print(e)  # TODO: print complete traceback
+
             remove_button = button(
                 f"Clear {which}",
                 "danger",
@@ -164,7 +181,7 @@ def do_in_tab(tab, ds, which):
     return _on_click
 
 
-def create_tab(do_display=True):
+def create_tab(do_display: bool = True) -> Tab:
     tab = Tab(children=(Output(),))
 
     tab.set_title(0, "Info")
@@ -176,7 +193,7 @@ def create_tab(do_display=True):
     return tab
 
 
-def editable_metadata(ds):
+def editable_metadata(ds: DataSet) -> Box:
     def _button_to_input(text, box):
         def on_click(_):
             text_input = Textarea(
@@ -239,23 +256,35 @@ def expandable_dict(dct, tab, ds):
                 on_click=do_in_tab(tab, ds, "snapshot"),
                 button_kwargs=dict(icon="camera"),
             )
+            dataset_button = button(
+                "Inpect dataset",
+                "warning",
+                on_click=do_in_tab(tab, ds, "dataset"),
+                button_kwargs=dict(icon="search"),
+            )
             back_button = button(
                 "Back",
                 "warning",
                 on_click=_input_to_button(dct, box),
                 button_kwargs=dict(icon="undo"),
             )
-            box.children = (text_input, snapshot_button, plot_button, back_button)
+            box.children = (
+                text_input,
+                snapshot_button,
+                dataset_button,
+                plot_button,
+                back_button,
+            )
 
         return on_click
 
     def _input_to_button(dct, box):
         def on_click(_):
-            box.children = (_changeble_button(dct, box),)
+            box.children = (_changeable_button(dct, box),)
 
         return on_click
 
-    def _changeble_button(dct, box):
+    def _changeable_button(dct, box):
         return button(
             ", ".join(dct),
             "success",
@@ -264,11 +293,11 @@ def expandable_dict(dct, tab, ds):
         )
 
     box = VBox([], layout=Layout(height="auto", width="auto"))
-    box.children = (_changeble_button(dct, box),)
+    box.children = (_changeable_button(dct, box),)
     return box
 
 
-def get_coords_and_vars(ds):
+def get_coords_and_vars(ds: DataSet) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     coordinates = {}
     variables = {}
     for p, spec in ds.paramspecs.items():
@@ -285,7 +314,7 @@ def get_coords_and_vars(ds):
     return coordinates, variables
 
 
-def _experiment_widget(tab):
+def _experiment_widget(tab: Tab) -> GridspecLayout:
     header_names = [
         "Run ID",
         "Name",
@@ -325,7 +354,11 @@ def _experiment_widget(tab):
     return grid
 
 
-def experiments_widget(db=None):
+def experiments_widget(db: Optional[str] = None) -> VBox:
+    """Displays an interactive widget that shows the ``qcodes.experiments()``.
+
+    Args
+        db: Optionally pass a database file, if no database has been loaded."""
     if db is not None:
         initialise_or_create_database_at(db)
     title = HTML("<h1>QCoDeS experiments widget</h1>")
