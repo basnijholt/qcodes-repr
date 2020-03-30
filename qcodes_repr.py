@@ -1,3 +1,6 @@
+"""This file contains functions to displays an interactive widget
+with information about `qcodes.experiments()`."""
+
 import math
 from functools import partial
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple
@@ -57,7 +60,7 @@ def button(
 
 
 def text(description: str) -> Label:
-    """Returns a ipywidgets.Label with text."""
+    """Returns a `ipywidgets.Label` with text."""
     return Label(value=description, layout=Layout(height="max-content", width="auto"))
 
 
@@ -126,7 +129,10 @@ def _nested_dict_browser(
     return grid
 
 
-def nested_dict_browser(nested_dict: Dict[Any, Any], nested_keys: Sequence[str] = ()):
+def nested_dict_browser(
+    nested_dict: Dict[Any, Any], nested_keys: Sequence[str] = ()
+) -> Box:
+    """Returns a widget to interactive browse a nested dictionary."""
     box = Box([])
     _update_nested_dict_browser(nested_keys, nested_dict, box)(None)
     return box
@@ -147,7 +153,7 @@ def _plot_ds(ds: DataSet) -> None:
         print(e)  # TODO: print complete traceback
 
 
-def do_in_tab(tab: Tab, ds: DataSet, which: str) -> Callable[[Button], None]:
+def _do_in_tab(tab: Tab, ds: DataSet, which: str) -> Callable[[Button], None]:
     def delete_tab(output, tab):
         def on_click(_):
             tab.children = tuple(c for c in tab.children if c != output)
@@ -193,6 +199,7 @@ def do_in_tab(tab: Tab, ds: DataSet, which: str) -> Callable[[Button], None]:
 
 
 def create_tab(do_display: bool = True) -> Tab:
+    """Creates a `ipywidgets.Tab` which can display outputs in its tabs."""
     tab = Tab(children=(Output(),))
 
     tab.set_title(0, "Info")
@@ -227,11 +234,11 @@ def editable_metadata(ds: DataSet) -> Box:
         def on_click(_):
             text = box.children[0].value
             ds.add_metadata(tag=_META_DATA_KEY, metadata=text)
-            box.children = (_changeble_button(text, box),)
+            box.children = (_changeable_button(text, box),)
 
         return on_click
 
-    def _changeble_button(text, box):
+    def _changeable_button(text, box):
         return button(
             text,
             "success",
@@ -241,7 +248,7 @@ def editable_metadata(ds: DataSet) -> Box:
 
     text = ds.metadata.get(_META_DATA_KEY, "")
     box = VBox([], layout=Layout(height="auto", width="auto"))
-    box.children = (_changeble_button(text, box),)
+    box.children = (_changeable_button(text, box),)
     return box
 
 
@@ -258,19 +265,19 @@ def expandable_dict(dct, tab, ds):
             plot_button = button(
                 "Plot",
                 "warning",
-                on_click=do_in_tab(tab, ds, "plot"),
+                on_click=_do_in_tab(tab, ds, "plot"),
                 button_kwargs=dict(icon="line-chart"),
             )
             snapshot_button = button(
                 "Open snapshot",
                 "warning",
-                on_click=do_in_tab(tab, ds, "snapshot"),
+                on_click=_do_in_tab(tab, ds, "snapshot"),
                 button_kwargs=dict(icon="camera"),
             )
             dataset_button = button(
                 "Inpect dataset",
                 "warning",
-                on_click=do_in_tab(tab, ds, "dataset"),
+                on_click=_do_in_tab(tab, ds, "dataset"),
                 button_kwargs=dict(icon="search"),
             )
             back_button = button(
@@ -308,7 +315,7 @@ def expandable_dict(dct, tab, ds):
     return box
 
 
-def get_coords_and_vars(ds: DataSet) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def _get_coords_and_vars(ds: DataSet) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     coordinates = {}
     variables = {}
     for p, spec in ds.paramspecs.items():
@@ -326,6 +333,8 @@ def get_coords_and_vars(ds: DataSet) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
 
 def _experiment_widget(tab: Tab) -> GridspecLayout:
+    """Show a `ipywidgets.GridspecLayout` with information about the
+    loaded experiment."""
     header_names = [
         "Run ID",
         "Name",
@@ -342,7 +351,7 @@ def _experiment_widget(tab: Tab) -> GridspecLayout:
         tooltip = f"{exp.name}#{exp.sample_name}@{exp.path_to_db}"
 
         for ds in exp.data_sets():
-            coords, variables = get_coords_and_vars(ds)
+            coords, variables = _get_coords_and_vars(ds)
             row = {}
             row["Run ID"] = text(str(ds.run_id))
             row["Name"] = text(ds.name)
@@ -366,10 +375,18 @@ def _experiment_widget(tab: Tab) -> GridspecLayout:
 
 
 def experiments_widget(db: Optional[str] = None) -> VBox:
-    """Displays an interactive widget that shows the ``qcodes.experiments()``.
+    f"""Displays an interactive widget that shows the ``qcodes.experiments()``.
+
+    Using the edit button in the column "Notes", one can make persistent changes
+    to the `~qcodes.dataset.data_set.DataSet`\s attribute ``metadata``
+    in the key "{_META_DATA_KEY}".
+    Expanding the coordinates or variables buttons, reveals more options, such as
+    plotting or the ability to easily browse
+    the `~qcodes.dataset.data_set.DataSet`\s snapshot.
 
     Args
-        db: Optionally pass a database file, if no database has been loaded."""
+        db: Optionally pass a database file, if no database has been loaded.
+    """
     if db is not None:
         initialise_or_create_database_at(db)
     title = HTML("<h1>QCoDeS experiments widget</h1>")
