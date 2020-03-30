@@ -1,6 +1,6 @@
 import math
 from functools import partial
-from typing import (Any, Callable, Dict, Iterable, Optional,
+from typing import (Any, Callable, Dict, Sequence, Optional,
                     Tuple)
 
 import matplotlib.pyplot as plt
@@ -51,7 +51,7 @@ def text(description: str) -> Label:
 
 
 def _update_nested_dict_browser(
-    nested_keys: Iterable[str], table: Dict[Any, Any], box: Box
+    nested_keys: Sequence[str], table: Dict[Any, Any], box: Box
 ) -> Callable[[Button], None]:
     def _(_):
         box.children = (_nested_dict_browser(nested_keys, table, box),)
@@ -60,7 +60,7 @@ def _update_nested_dict_browser(
 
 
 def _nested_dict_browser(
-    nested_keys: Iterable[str], table: Dict[Any, Any], box: Box, max_nrows: int = 30
+    nested_keys: Sequence[str], table: Dict[Any, Any], box: Box, max_nrows: int = 30
 ) -> GridspecLayout:
     def _should_expand(x):
         return isinstance(x, dict) and x != {}
@@ -115,7 +115,7 @@ def _nested_dict_browser(
     return grid
 
 
-def nested_dict_browser(nested_dict: Dict[Any, Any], nested_keys: Iterable[str] = ()):
+def nested_dict_browser(nested_dict: Dict[Any, Any], nested_keys: Sequence[str] = ()):
     box = Box([])
     _update_nested_dict_browser(nested_keys, nested_dict, box)(None)
     return box
@@ -339,7 +339,7 @@ def _experiment_widget(tab: Tab) -> GridspecLayout:
             row["Notes"] = editable_metadata(ds)
             row["Coordinates"] = expandable_dict(coords, tab, ds)
             row["Variables"] = expandable_dict(variables, tab, ds)
-            row["MSMT Time"] = text(ds.completed_timestamp())
+            row["MSMT Time"] = text(ds.completed_timestamp() or "")
             rows.append(row)
 
     grid = GridspecLayout(n_rows=len(rows), n_columns=len(header_names))
