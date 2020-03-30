@@ -76,6 +76,13 @@ def _update_nested_dict_browser(
 def _nested_dict_browser(
     nested_keys: Sequence[str], table: Dict[Any, Any], box: Box, max_nrows: int = 30
 ) -> GridspecLayout:
+    """Generates a `GridspecLayout` of the ``nested_keys`` in ``table`` which is
+    put inside of ``box``.
+
+    Whenever the table has less than ``max_nrows`` rows, the table is
+    displayed in 3 columns, otherwise it's 2 columns.
+    """
+
     def _should_expand(x):
         return isinstance(x, dict) and x != {}
 
@@ -154,6 +161,14 @@ def _plot_ds(ds: DataSet) -> None:
 
 
 def _do_in_tab(tab: Tab, ds: DataSet, which: str) -> Callable[[Button], None]:
+    """Performs an operation inside of a subtab of a `ipywidgets.Tab`.
+
+    Args
+        tab: Instance of `ipywidgets.Tab`
+        ds: A DataSet
+        which: can be either "plot", "snapshot", or "dataset"
+    """
+
     def delete_tab(output, tab):
         def on_click(_):
             tab.children = tuple(c for c in tab.children if c != output)
@@ -167,7 +182,7 @@ def _do_in_tab(tab: Tab, ds: DataSet, which: str) -> Callable[[Button], None]:
             (i for i in range(len(tab.children)) if tab.get_title(i) == title), None
         )
         if i is not None:
-            # Plot is already in the tab
+            # Plot/snapshot is already in the tab
             tab.selected_index = i
             return
         out = Output()
@@ -253,6 +268,9 @@ def editable_metadata(ds: DataSet) -> Box:
 
 
 def expandable_dict(dct, tab, ds):
+    """Returns a `ipywidgets.Button` which on click changes into a text area
+    and buttons, that when clicked show something in a subtab of ``tab``."""
+
     def _button_to_input(dct, box):
         def on_click(_):
             description = yaml.dump(dct)  # TODO: include and extract more data!
@@ -334,7 +352,8 @@ def _get_coords_and_vars(ds: DataSet) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
 def _experiment_widget(tab: Tab) -> GridspecLayout:
     """Show a `ipywidgets.GridspecLayout` with information about the
-    loaded experiment."""
+    loaded experiment. The clickable buttons can perform an action in ``tab``.
+    """
     header_names = [
         "Run ID",
         "Name",
